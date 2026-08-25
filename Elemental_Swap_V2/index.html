@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Elemental Swap V2｜十相回路</title>
+  <title>Elemental Swap V2.2｜十相回路</title>
   <meta name="description" content="2D 橫向卷軸元素換位動作遊戲原型：10 種元素、Combo、4 職業、解謎與 2P WebRTC。">
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -11,7 +11,7 @@
   <div class="app-shell">
     <header class="topbar">
       <div>
-        <h1>ELEMENTAL SWAP <span>V2</span></h1>
+        <h1>ELEMENTAL SWAP <span>V2.2</span></h1>
         <p>十相回路｜元素投射・位置交換・連段・解謎</p>
       </div>
       <div class="top-actions">
@@ -37,8 +37,30 @@
         <div id="combo" class="combo"></div>
       </div>
 
+      <div class="hud hud-right">
+        <div class="objective-card">
+          <span class="eyebrow">目前目標</span>
+          <strong id="objectiveTitle">安全訓練區</strong>
+          <span id="objectiveText">先找到畫面中央發光的「YOU」角色。</span>
+        </div>
+        <div id="threatPanel" class="threat-panel safe">SAFE｜敵人尚未啟動</div>
+      </div>
+
+      <div id="startCoach" class="start-coach">
+        <strong>▼ YOU / 玩家</strong>
+        <span>發光白色角色就是你</span>
+      </div>
+
+      <div id="damageVignette" class="damage-vignette"></div>
       <div id="toast" class="toast"></div>
-      <div id="elements" class="elements"></div>
+
+      <div class="combat-dock">
+        <div id="currentElement" class="current-element">
+          <b>元素射擊</b><span>按 1–0 發射；同一鍵再按一次＝換位</span>
+        </div>
+        <div id="skills" class="skills"></div>
+        <div id="elements" class="elements"></div>
+      </div>
     </main>
 
     <section class="network-card">
@@ -52,7 +74,7 @@
       <button id="disconnectRoom" class="ghost">斷線</button>
     </section>
 
-    <section class="quick-guide">
+    <section class="quick-guide" aria-label="快捷操作">
       <article><b>A / D</b><span>左右移動</span></article>
       <article><b>SPACE ×2</b><span>跳躍／二段跳</span></article>
       <article><b>Z / X</b><span>快攻／重攻連段</span></article>

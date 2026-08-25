@@ -81,7 +81,7 @@
       this.started = true;
       this.time = 0;
       this.lastFrame = performance.now();
-      this.camera = { x: 0, y: 0 };
+      this.camera = { x: 0, y: 110 };
       this.screenShake = 0;
       this.hitStop = 0;
       this.message = { text: "", t: 0 };
@@ -102,7 +102,13 @@
       this.lastElement = null;
       this.elementHistory = [];
       this.puzzleFlags = new Set();
-      this.stats = { kills: 0, swaps: 0, maxCombo: 0 };
+      this.stats = { kills: 0, swaps: 0, maxCombo: 0, shots: 0, meleeHits: 0 };
+      // V2.2：先讓玩家看懂畫面再開戰。x < safeZoneEnd 時敵人不會主動攻擊。
+      this.safeZoneEnd = 1180;
+      this.combatUnlocked = false;
+      this.tutorialStep = 0;
+      this.damageFlash = 0;
+      this.lastDamageSource = "";
       this.debugEnabled = true;
 
       this.player = this.makePlayer(220, C.GROUND_Y - C.PLAYER.height, "rift");
@@ -186,7 +192,7 @@
 
       // 障礙物與機關
       this.hazards.push(
-        {type:"spikes",x:1500,y:680,w:180,h:30}, {type:"spikes",x:3650,y:680,w:220,h:30},
+        {type:"spikes",x:1650,y:680,w:150,h:30}, {type:"spikes",x:3650,y:680,w:220,h:30},
         {type:"water",x:2250,y:650,w:350,h:60,frozen:0}, {type:"water",x:5650,y:650,w:500,h:60,frozen:0},
         {type:"firewall",x:3220,y:540,w:38,h:170,active:true}, {type:"firewall",x:10180,y:500,w:40,h:210,active:true},
         {type:"laser",x:11480,y:430,w:18,h:280,active:true,phase:0},
@@ -214,7 +220,7 @@
 
       // 敵人配置：不同區域混搭不同 AI。
       const spawns = [
-        [900,"slime"],[1320,"slime"],[2050,"archer"],[2810,"shield"],[3200,"bat"],[4050,"turret"],
+        [900,"dummy"],[1450,"slime"],[2050,"archer"],[2810,"shield"],[3200,"bat"],[4050,"turret"],
         [4850,"slime"],[5250,"shield"],[6100,"golem"],[6870,"bat"],[7310,"archer"],[8050,"mage"],
         [8750,"shield"],[9360,"mage"],[10080,"turret"],[10900,"bat"],[11650,"golem"],[12250,"mage"],
         [13050,"turret"],[13800,"shield"],[14200,"mage"],[15000,"golem"],[15850,"archer"],[16450,"golem"],
@@ -230,8 +236,9 @@
       this.enemies.push({
         id: Math.random().toString(36).slice(2), type, name:t.name,
         x, y:y-(h-58), w, h, vx:0, vy:0, dir:-1,
-        hp:t.hp, maxHp:t.hp, damage:t.damage, speed:t.speed,
+        hp:t.hp, maxHp:t.hp, damage:t.damage, speed:t.speed, ai:t.type,
         aiT:rand(0,1), hurtT:0, stun:0, slow:0, root:0, wet:0, burn:0,
+        aggro:false, alert:0,
         armorBreak:0, cursed:0, marked:null, markT:0, dead:false,
         superArmor:type==="boss" || type==="golem", phase:0
       });
@@ -255,6 +262,8 @@
 
     update(dt, tsMs) {
       this.time += dt;
+      this.damageFlash = Math.max(0, this.damageFlash - dt);
+      this.updateTutorial(dt);
       this.updateGlobalInput();
       this.updatePlayer(dt);
       this.updateProjectiles(dt);
@@ -272,6 +281,26 @@
     action(name, tap=false) {
       const code = this.keys[name];
       return tap ? this.input.tap(code) : this.input.down(code);
+    }
+
+    updateTutorial(dt) {
+      const p=this.player;
+      this.combatUnlocked = p.x > this.safeZoneEnd;
+      const moved=Math.abs(p.x-220)>90;
+      if(this.tutorialStep===0 && moved){this.tutorialStep=1;this.say("很好。現在按 1 發射火元素，先看清楚它的軌跡。",4);}
+      if(this.tutorialStep===1 && this.stats.shots>0){this.tutorialStep=2;this.say("再按一次同樣的 1：你會與火元素／火標記敵人換位。",4);}
+      if(this.tutorialStep===2 && this.stats.swaps>0){this.tutorialStep=3;this.say("換位成功！往右找藍色訓練傀儡，用 Z → Z → X 練連段。",5);}
+      if(this.tutorialStep===3 && this.stats.meleeHits>=3){this.tutorialStep=4;this.say("連段完成。越過黃色安全線後，真正敵人才會啟動。",5);}
+      if(this.tutorialStep===4 && this.combatUnlocked){this.tutorialStep=5;this.say("戰鬥區啟動：紅色 ! 與畫面邊緣箭頭代表敵人威脅。",5);}
+    }
+
+    tutorialObjective() {
+      if(this.tutorialStep===0)return ["STEP 1｜先找到自己","發光白色角色＋頭上 YOU 就是你。按 A / D 移動。"];
+      if(this.tutorialStep===1)return ["STEP 2｜發射元素","按 1 發射火元素。現在彈體更大、更慢，也有元素專屬軌跡。"];
+      if(this.tutorialStep===2)return ["STEP 3｜同鍵換位","再按 1，與火元素交換位置。這是整款遊戲的核心。"];
+      if(this.tutorialStep===3)return ["STEP 4｜練 Combo","到右側藍色訓練傀儡旁，輸入 Z → Z → X。傀儡不會攻擊。"];
+      if(this.tutorialStep===4)return ["STEP 5｜離開安全區","向右越過 1180px 的安全線；離開後敵人才開始主動攻擊。"];
+      return ["探索十相回路","元素標記敵人後，再按同元素鍵換位；利用地形與 Combo 推進。"];
     }
 
     updateGlobalInput() {
@@ -437,6 +466,7 @@
         this.damageEnemy(e,damage,kx,ky,label);
         hits++;
       }
+      this.stats.meleeHits += hits;
       return hits;
     }
 
@@ -478,18 +508,24 @@
       const p=this.player;
       const aimY = this.action("aimUp") ? -0.72 : this.action("aimDown") ? 0.72 : 0;
       const mag = Math.hypot(1,aimY);
-      let dx=p.dir/mag, dy=aimY/mag;
+      const dx=p.dir/mag, dy=aimY/mag;
+      const visualSize = el.size * 2.35;
       const shot={
         id:Math.random().toString(36).slice(2), type:"element", element:el.id,
-        x:cx(p)-el.size/2 + p.dir*24, y:cy(p)-el.size/2,
-        w:el.size*2,h:el.size*2,vx:dx*el.speed,vy:dy*el.speed,
-        t:5,anchor:true,bounces:el.id==="water"?2:0,owner:"local"
+        x:cx(p)-visualSize/2 + p.dir*34, y:cy(p)-visualSize/2,
+        w:visualSize,h:visualSize,vx:dx*el.speed,vy:dy*el.speed,
+        t:6,anchor:true,bounces:el.id==="water"?2:0,owner:"local",trail:[]
       };
       this.projectiles.push(shot);
       this.lastElement = el.id;
       this.elementHistory.push(el.id);
       if (this.elementHistory.length>4) this.elementHistory.shift();
-      this.fx(cx(shot),cy(shot),"muzzle",el.color,0.2);
+      this.stats.shots++;
+      const index=C.ELEMENTS.findIndex(e=>e.id===el.id);
+      const key=index===9?"0":String(index+1);
+      this.fx(cx(shot),cy(shot),"muzzle",el.color,0.35,{text:el.glyph});
+      this.screenShake=Math.max(this.screenShake,2.5);
+      this.say(`${el.glyph} ${el.name}發射｜再按 ${key}＝與它換位`,1.5);
     }
 
     findSwapTarget(elementId) {
@@ -600,6 +636,9 @@
       for (const s of this.projectiles) {
         s.t-=dt;
         const el=C.ELEMENTS.find(x=>x.id===s.element);
+        s.trail=s.trail||[];
+        s.trail.unshift({x:cx(s),y:cy(s)});
+        if(s.trail.length>14)s.trail.pop();
         s.vy += el.gravity*dt;
         if (s.element==="gravity") {
           for (const e of this.enemies) if(!e.dead && dist(s,e)<220) { const d=cx(s)-cx(e); e.vx += sign(d)*220*dt; }
@@ -621,22 +660,22 @@
     }
 
     applyElementHit(e,el,s) {
-      let dmg=el.damage;
+      let dmg=el.damage, status="標記";
       e.marked=el.id; e.markT=el.markDuration;
       switch(el.id) {
-        case "fire": e.burn=4.5; break;
-        case "ice": e.slow=5; e.vx*=0.25; break;
-        case "lightning": e.stun=0.7; if(e.wet>0) dmg*=2.1; break;
-        case "wind": e.vx+=this.player.dir*650; break;
-        case "earth": e.armorBreak=6; e.stun=Math.max(e.stun,0.25); break;
-        case "water": e.wet=8; break;
-        case "light": if(e.type==="mage" || e.cursed>0) dmg*=1.8; break;
-        case "shadow": e.cursed=7; break;
-        case "nature": e.root=2.5; break;
-        case "gravity": e.vx+=(cx(this.player)-cx(e))*0.8; break;
+        case "fire": e.burn=4.5; status="燃燒"; break;
+        case "ice": e.slow=5; e.vx*=0.25; status="冰緩"; break;
+        case "lightning": e.stun=0.7; if(e.wet>0) dmg*=2.1; status=e.wet>0?"導電暴擊":"暈眩"; break;
+        case "wind": e.vx+=this.player.dir*650; status="強制擊飛"; break;
+        case "earth": e.armorBreak=6; e.stun=Math.max(e.stun,0.25); status="破甲"; break;
+        case "water": e.wet=8; status="濕潤"; break;
+        case "light": if(e.type==="mage" || e.cursed>0) dmg*=1.8; status="顯形／淨化"; break;
+        case "shadow": e.cursed=7; status="詛咒"; break;
+        case "nature": e.root=2.5; status="纏根"; break;
+        case "gravity": e.vx+=(cx(this.player)-cx(e))*0.8; status="引力拉扯"; break;
       }
       this.damageEnemy(e,dmg,s.vx*0.18,s.vy*0.08,`${el.name}命中`);
-      this.fx(cx(e),cy(e),"elementHit",el.color,0.3,{text:el.glyph});
+      this.fx(cx(e),cy(e),"elementHit",el.color,0.55,{text:`${el.glyph} ${status}`});
       if (el.id==="lightning" && e.wet>0) this.chainLightning(cx(e),cy(e),3,18,e);
     }
 
@@ -728,26 +767,32 @@
     updateEnemies(dt){
       const p=this.player;
       for(const e of this.enemies){
-        if(e.dead)continue;
+        if(e.dead){e.hurtT=Math.max(0,e.hurtT-dt);continue;}
         e.hurtT=Math.max(0,e.hurtT-dt);e.stun=Math.max(0,e.stun-dt);e.slow=Math.max(0,e.slow-dt);e.root=Math.max(0,e.root-dt);e.wet=Math.max(0,e.wet-dt);e.armorBreak=Math.max(0,e.armorBreak-dt);e.cursed=Math.max(0,e.cursed-dt);e.markT=Math.max(0,e.markT-dt);if(e.markT<=0)e.marked=null;
         if(e.burn>0){e.burn-=dt;e.hp-=4.2*dt;if(e.hp<=0){e.dead=true;this.stats.kills++;}}
         e.aiT-=dt;
         const dx=cx(p)-cx(e), ad=Math.abs(dx), dir=sign(dx); e.dir=dir;
-        if(e.stun<=0){
+        const inAwareness = e.x+e.w > this.camera.x-260 && e.x < this.camera.x+this.viewW+260;
+        const range=e.type==="boss"?1450:850;
+        const canAggro=e.ai!=="passive" && (this.combatUnlocked || e.type==="boss") && ad<range && inAwareness;
+        if(canAggro&&!e.aggro)e.alert=0.85;
+        e.aggro=canAggro;e.alert=Math.max(0,(e.alert||0)-dt);
+
+        if(canAggro && e.stun<=0){
           const scale=e.slow>0?0.38:1;
-          if(e.type==="melee") e.vx=ad<700?dir*e.speed*scale:e.vx*0.9;
-          else if(e.type==="ranged") { e.vx=(ad<260?-dir:ad>520?dir:0)*e.speed*scale; if(ad<620&&e.aiT<=0){e.aiT=1.5;this.enemyShoot(e,260,0);} }
-          else if(e.type==="shield") e.vx=ad<650?dir*e.speed*scale:e.vx*0.9;
-          else if(e.type==="flying") { e.vx=dir*e.speed*scale; e.vy += (p.y-90-e.y)*dt*2.2; e.y+=e.vy*dt; if(ad<180&&e.aiT<=0){e.aiT=1.2;e.vy=260;} }
-          else if(e.type==="turret") {e.vx=0;if(ad<760&&e.aiT<=0){e.aiT=1.25;this.enemyShoot(e,330,(cy(p)-cy(e))*0.7);}}
-          else if(e.type==="mage") {if(e.aiT<=0){e.aiT=2.3;e.x=clamp(p.x-dir*rand(250,430),0,C.WORLD_WIDTH-e.w);this.enemyShoot(e,240,(cy(p)-cy(e))*0.55);this.fx(cx(e),cy(e),"swap","#9d75ff",0.3);} }
-          else if(e.type==="heavy") e.vx=ad<600?dir*e.speed*scale:0;
-          else if(e.type==="boss") this.updateBoss(e,p,dt,ad,dir);
-        } else e.vx*=0.86;
+          if(e.ai==="melee") e.vx=ad<700?dir*e.speed*scale:e.vx*0.9;
+          else if(e.ai==="ranged") { e.vx=(ad<260?-dir:ad>520?dir:0)*e.speed*scale; if(ad<620&&e.aiT<=0){e.aiT=1.65;this.enemyShoot(e,235,0);} }
+          else if(e.ai==="shield") e.vx=ad<650?dir*e.speed*scale:e.vx*0.9;
+          else if(e.ai==="flying") { e.vx=dir*e.speed*scale; e.vy += (p.y-90-e.y)*dt*2.2; e.y+=e.vy*dt; if(ad<180&&e.aiT<=0){e.aiT=1.2;e.vy=260;} }
+          else if(e.ai==="turret") {e.vx=0;if(ad<760&&e.aiT<=0){e.aiT=1.55;this.enemyShoot(e,275,(cy(p)-cy(e))*0.55);}}
+          else if(e.ai==="mage") {if(e.aiT<=0){e.aiT=2.5;e.x=clamp(p.x-dir*rand(300,460),0,C.WORLD_WIDTH-e.w);this.enemyShoot(e,210,(cy(p)-cy(e))*0.45);this.fx(cx(e),cy(e),"swap","#9d75ff",0.3);} }
+          else if(e.ai==="heavy") e.vx=ad<600?dir*e.speed*scale:0;
+          else if(e.ai==="boss") this.updateBoss(e,p,dt,ad,dir);
+        } else if(e.ai!=="passive") e.vx*=0.86;
 
         if(e.root>0)e.vx=0;
-        if(e.type!=="flying"&&e.type!=="turret"){e.vy=Math.min(900,e.vy+C.GRAVITY*dt);e.x+=e.vx*dt;e.y+=e.vy*dt;this.enemyFloor(e);}
-        if(ad<42+(e.w+p.w)/2 && Math.abs(cy(p)-cy(e))<70 && e.aiT<=0){e.aiT=0.85;this.damagePlayer(e.damage,dir*300,-180,e.name);}
+        if(e.ai!=="flying"&&e.ai!=="turret"){e.vy=Math.min(900,e.vy+C.GRAVITY*dt);e.x+=e.vx*dt;e.y+=e.vy*dt;this.enemyFloor(e);}
+        if(canAggro && ad<42+(e.w+p.w)/2 && Math.abs(cy(p)-cy(e))<70 && e.aiT<=0){e.aiT=0.95;this.damagePlayer(e.damage,dir*300,-180,e.name);}
       }
       this.enemies=this.enemies.filter(e=>!(e.dead&&e.type!=="boss") || e.hurtT>0);
       this.updateEnemyShots(dt);
@@ -762,17 +807,30 @@
     updateBoss(e,p,dt,ad,dir){
       e.phase=e.hp/e.maxHp<0.33?3:e.hp/e.maxHp<0.66?2:1;
       e.vx=ad>160?dir*e.speed*(1+e.phase*0.14):0;
-      if(e.aiT<=0){e.aiT=Math.max(0.7,1.8-e.phase*0.25);if(Math.random()<0.55){for(let i=-e.phase;i<=e.phase;i++)this.enemyShoot(e,300+i*15,i*80);}else{this.effects.push({type:"danger",x:p.x-80,y:C.GROUND_Y-220,w:210,h:220,t:0.75,color:"#ff4568",explode:true});}}
+      if(e.aiT<=0){e.aiT=Math.max(0.9,2.05-e.phase*0.22);if(Math.random()<0.55){for(let i=-e.phase;i<=e.phase;i++)this.enemyShoot(e,270+i*15,i*70);}else{this.effects.push({type:"danger",x:p.x-80,y:C.GROUND_Y-220,w:210,h:220,t:0.95,color:"#ff4568",explode:true});}}
     }
 
-    enemyShoot(e,speed,vy){this.enemyShots.push({x:cx(e),y:cy(e),w:12,h:12,vx:e.dir*speed,vy:vy||0,t:4,damage:e.damage,owner:e.name});}
-    updateEnemyShots(dt){for(const s of this.enemyShots){s.t-=dt;s.x+=s.vx*dt;s.y+=s.vy*dt;if(rectHit(s,this.player)){this.damagePlayer(s.damage,sign(s.vx)*180,-100,s.owner);s.t=0;}}this.enemyShots=this.enemyShots.filter(s=>s.t>0);}
+    // 遠程攻擊先有 warmup 預警，再真正飛行，避免畫面外無預警受傷。
+    enemyShoot(e,speed,vy){
+      this.enemyShots.push({x:cx(e)-9,y:cy(e)-9,w:18,h:18,vx:e.dir*speed,vy:vy||0,t:4.6,warmup:0.42,damage:e.damage,owner:e.name,color:C.ENEMIES[e.type].color});
+    }
+    updateEnemyShots(dt){
+      for(const s of this.enemyShots){
+        s.t-=dt;
+        if(s.warmup>0){s.warmup-=dt;continue;}
+        s.x+=s.vx*dt;s.y+=s.vy*dt;
+        if(rectHit(s,this.player)){this.damagePlayer(s.damage,sign(s.vx)*180,-100,s.owner);s.t=0;}
+      }
+      this.enemyShots=this.enemyShots.filter(s=>s.t>0);
+    }
 
     damagePlayer(dmg,kx,ky,source){
       const p=this.player;if(p.invuln>0||p.phase>0)return;
       if(p.shield>0){const a=Math.min(p.shield,dmg);p.shield-=a;dmg-=a;}
       if(dmg<=0)return;
-      p.hp-=dmg;p.invuln=C.PLAYER.invulnAfterHit;this.screenShake=8;this.fx(cx(p),cy(p),"hit","#ff6d7b",0.25,{text:`-${Math.round(dmg)}`});
+      p.hp-=dmg;p.invuln=C.PLAYER.invulnAfterHit;this.screenShake=9;this.damageFlash=0.28;this.lastDamageSource=source;
+      this.fx(cx(p),cy(p),"hit","#ff4763",0.38,{text:`-${Math.round(dmg)} ${source}`});
+      this.say(`受擊｜${source} 造成 ${Math.round(dmg)} 傷害`,1.5);
       if(p.superArmor<=0){p.vx=kx;p.vy=ky;}
       if(p.hp<=0){this.say(`被 ${source} 擊倒`);this.respawn();}
     }
@@ -842,17 +900,28 @@
       $("#closeKeys").onclick=()=>this.togglePanel("keyPanel",false);
       $("#resetKeys").onclick=()=>{this.keys=Object.assign({},C.DEFAULT_KEYS);this.saveKeys();this.renderKeyList();};
       this.renderElementBar();
+      this.renderSkillBar();
+      this.say("安全訓練區｜敵人不會主動攻擊。先按 A / D 找到自己。",5);
     }
 
     changeClass(id){
       const old=this.player, cl=C.CLASSES[id];if(!cl)return;
-      old.classId=id;old.maxHp=cl.maxHp;old.maxMp=cl.maxMp;old.hp=Math.min(old.hp,old.maxHp);old.mp=Math.min(old.mp,old.maxMp);old.attackStep=0;this.say(`切換職業：${cl.name}`);
+      old.classId=id;old.maxHp=cl.maxHp;old.maxMp=cl.maxMp;old.hp=Math.min(old.hp,old.maxHp);old.mp=Math.min(old.mp,old.maxMp);old.attackStep=0;this.renderSkillBar();this.say(`切換職業：${cl.name}`);
     }
 
     togglePanel(id,force){const el=$("#"+id);const show=force===undefined?el.hidden:force;el.hidden=!show;}
     openKeyConfig(){this.renderKeyList();this.togglePanel("keyPanel",true);}
     renderKeyList(){const box=$("#keyList");box.innerHTML="";for(const [action,label] of Object.entries(C.ACTION_LABELS)){const b=document.createElement("button");b.className="key-row";b.innerHTML=`<span>${label}</span><kbd>${fmtKey(this.keys[action])}</kbd>`;b.onclick=()=>{b.querySelector("kbd").textContent="按新鍵…";this.input.capture=(code)=>{for(const [a,k] of Object.entries(this.keys))if(k===code&&a!==action)this.keys[a]=this.keys[action];this.keys[action]=code;this.saveKeys();this.renderKeyList();};};box.appendChild(b);}}
-    renderElementBar(){const box=$("#elements");box.innerHTML=C.ELEMENTS.map((e,i)=>`<div class="element-chip" style="--ec:${e.color}" title="${e.description}"><kbd>${i===9?0:i+1}</kbd><b>${e.glyph}</b><span>${e.name}</span></div>`).join("");}
+    renderElementBar(){const box=$("#elements");box.innerHTML=C.ELEMENTS.map((e,i)=>`<div class="element-chip" data-element="${e.id}" style="--ec:${e.color}" title="${e.description}"><kbd>${i===9?0:i+1}</kbd><b>${e.glyph}</b><span>${e.name}</span></div>`).join("");}
+    renderSkillBar(){
+      const p=this.player,cl=C.CLASSES[p.classId];
+      const items=[
+        ["Z","快攻","連段／空中追擊"], ["X","重攻","挑空／墜擊"],
+        ["C",cl.skills[0],"MP 25"],["V",cl.skills[1],"MP 38"],["B",cl.skills[2],"MP 70"],
+        ["Q",p.classId==="beast"?"切換獸形":p.classId==="summoner"?"靈獸指令":p.classId==="artificer"?"部署炮台":"裂隙爆發","職業能力"]
+      ];
+      $("#skills").innerHTML=items.map((it,i)=>`<div class="skill-chip" data-skill="${i}"><kbd>${it[0]}</kbd><b>${it[1]}</b><small>${it[2]}</small></div>`).join("");
+    }
     say(text,t=3){this.message={text,t};}
 
     updateHUD(){
@@ -864,6 +933,21 @@
       $("#combo").textContent=this.combo.hits>1?`${this.combo.hits} HIT  ${Math.round(this.combo.damage)} DMG`:"";
       let resource="";if(p.classId==="rift")resource=`裂隙 ${Math.floor(p.rift)}/100`;if(p.classId==="beast")resource=`姿態：${{wolf:"狼",eagle:"鷹",bear:"熊"}[p.beastForm]}`;if(p.classId==="summoner")resource=p.summonFrenzy>0?"星獸狂熱":"浮光狐待命";if(p.classId==="artificer")resource=`炮台 ${this.turrets.length}/3`;$("#classResource").textContent=resource;
       $("#toast").textContent=this.message.t>0?this.message.text:"";
+
+      const [ot,od]=this.tutorialObjective();$("#objectiveTitle").textContent=ot;$("#objectiveText").textContent=od;
+      const coach=$("#startCoach");coach.classList.toggle("hidden",this.tutorialStep>0);coach.style.left=`${clamp(cx(p)-this.camera.x,80,this.viewW-80)}px`;coach.style.top=`${clamp(p.y-this.camera.y,150,this.viewH-180)}px`;
+      $("#damageVignette").classList.toggle("hit",this.damageFlash>0);
+
+      const threats=this.enemies.filter(e=>!e.dead&&e.aggro).sort((a,b)=>dist(p,a)-dist(p,b));
+      const tp=$("#threatPanel");
+      if(!this.combatUnlocked){tp.className="threat-panel safe";tp.textContent="SAFE｜訓練區內敵人不主動攻擊";}
+      else if(threats.length){const e=threats[0],d=Math.round(Math.abs(cx(e)-cx(p)));tp.className="threat-panel danger";tp.textContent=`⚠ ${e.name}｜${d}px｜${cx(e)<cx(p)?"← 左":"右 →"}`;}
+      else {tp.className="threat-panel safe";tp.textContent="CLEAR｜附近沒有主動威脅";}
+
+      const el=this.lastElement?C.ELEMENTS.find(e=>e.id===this.lastElement):null;
+      if(el){const i=C.ELEMENTS.indexOf(el),key=i===9?0:i+1,target=this.findSwapTarget(el.id);$("#currentElement").innerHTML=`<b style="color:${el.color}">${el.glyph} ${el.name}</b><span>${target?`目前有換位目標｜再按 ${key} 立即交換`:`${el.description}`}</span>`;$("#currentElement").style.borderColor=el.color;}
+      for(const chip of document.querySelectorAll(".element-chip")){const id=chip.dataset.element;chip.classList.toggle("active",id===this.lastElement);chip.classList.toggle("anchor",this.projectiles.some(s=>s.anchor&&s.element===id&&s.t>0));chip.classList.toggle("marked",this.enemies.some(e=>!e.dead&&e.marked===id&&e.markT>0));}
+      const skillEls=document.querySelectorAll(".skill-chip");if(skillEls[2]){for(let i=0;i<3;i++){const elx=skillEls[i+2],cd=p.skillCD[i];elx.classList.toggle("cooling",cd>0);elx.querySelector("small").textContent=cd>0?`CD ${cd.toFixed(1)}s`:`MP ${[25,38,70][i]}`;}const q=skillEls[5];if(q){q.classList.toggle("cooling",p.qCD>0);q.querySelector("small").textContent=p.qCD>0?`CD ${p.qCD.toFixed(1)}s`:"職業能力";}}
     }
 
     updateCamera(dt){
@@ -877,12 +961,26 @@
       const zone=C.ZONES[this.currentZone]||C.ZONES[0];ctx.fillStyle=zone.sky;ctx.fillRect(0,0,W,H);
       // 遠景視差
       ctx.fillStyle="rgba(255,255,255,.035)";for(let i=0;i<18;i++){const x=((i*420-this.camera.x*0.18)%7600)-300;ctx.beginPath();ctx.arc(x,120+(i%4)*70,100+(i%3)*40,0,Math.PI*2);ctx.fill();}
-      const shakeX=this.screenShake?rand(-this.screenShake,this.screenShake):0,shakeY=this.screenShake?rand(-this.screenShake,this.screenShake):0;ctx.translate(-this.camera.x+shakeX,shakeY);
+      const shakeX=this.screenShake?rand(-this.screenShake,this.screenShake):0,shakeY=this.screenShake?rand(-this.screenShake,this.screenShake):0;ctx.translate(-this.camera.x+shakeX,-this.camera.y+shakeY);
       this.drawWorld(ctx);this.drawPuzzles(ctx);this.drawEffectsBehind(ctx);this.drawNPCs(ctx);this.drawEnemies(ctx);this.drawProjectiles(ctx);this.drawTurrets(ctx);this.drawPlayer(ctx,this.player,false);if(this.remote)this.drawRemote(ctx);this.drawEffectsFront(ctx);
       ctx.restore();
+      this.drawScreenIndicators(ctx);
+    }
+
+    drawScreenIndicators(ctx){
+      const W=this.viewW,H=this.viewH,p=this.player;
+      ctx.save();
+      // YOU 標記直接跟著玩家，不再靠玩家自己猜白色方塊是哪一個。
+      if(this.tutorialStep<2 || this.time<18){const sx=cx(p)-this.camera.x,sy=p.y-this.camera.y;ctx.fillStyle="#dffaff";ctx.font="900 14px sans-serif";ctx.textAlign="center";ctx.shadowColor="#59ddff";ctx.shadowBlur=12;ctx.fillText("▼ YOU / 玩家",clamp(sx,90,W-90),clamp(sy-24,90,H-170));ctx.shadowBlur=0;}
+      // 畫面外威脅方向箭頭。最多顯示 3 隻，避免資訊爆炸。
+      const off=this.enemies.filter(e=>!e.dead&&e.aggro&&(cx(e)-this.camera.x<70||cx(e)-this.camera.x>W-70)).sort((a,b)=>dist(p,a)-dist(p,b)).slice(0,3);
+      off.forEach((e,i)=>{const right=cx(e)>cx(p),x=right?W-32:32,y=210+i*64;ctx.fillStyle="#ff536a";ctx.beginPath();if(right){ctx.moveTo(x+14,y);ctx.lineTo(x-10,y-12);ctx.lineTo(x-10,y+12);}else{ctx.moveTo(x-14,y);ctx.lineTo(x+10,y-12);ctx.lineTo(x+10,y+12);}ctx.closePath();ctx.fill();ctx.fillStyle="rgba(5,8,14,.88)";ctx.fillRect(right?W-188:46,y-18,142,36);ctx.fillStyle="#fff";ctx.font="bold 10px sans-serif";ctx.textAlign=right?"right":"left";ctx.fillText(e.name,right?W-52:52,y-3);ctx.fillStyle="#ff8593";ctx.fillText(`${Math.round(Math.abs(cx(e)-cx(p)))}px`,right?W-52:52,y+12);});
+      ctx.restore();ctx.textAlign="left";
     }
 
     drawWorld(ctx){
+      // 安全訓練區邊界：讓玩家知道「越過這裡才會正式開戰」。
+      ctx.save();ctx.strokeStyle="rgba(255,223,93,.85)";ctx.setLineDash([12,10]);ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(this.safeZoneEnd,170);ctx.lineTo(this.safeZoneEnd,C.GROUND_Y);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle="#ffe36d";ctx.font="bold 13px sans-serif";ctx.fillText("戰鬥區 →",this.safeZoneEnd+12,205);ctx.restore();
       for(const z of C.ZONES){if(z.x1<this.camera.x-100||z.x0>this.camera.x+this.viewW+100)continue;ctx.fillStyle=z.ground;ctx.fillRect(z.x0,C.GROUND_Y,z.x1-z.x0,190);ctx.fillStyle="rgba(255,255,255,.06)";ctx.fillRect(z.x0,C.GROUND_Y,z.x1-z.x0,5);}
       for(const p of this.platforms){ctx.fillStyle=p.type==="moving"?"#7196a8":"#586878";ctx.fillRect(p.x,p.y,p.w,p.h);ctx.fillStyle="rgba(255,255,255,.13)";ctx.fillRect(p.x,p.y,p.w,4);}
       for(const p of this.tempPlatforms){ctx.fillStyle=p.type==="ice"?"#8fe5ff":p.type==="earth"?"#967252":p.type==="vine"?"#5db666":p.type==="spring"?"#69e5ff":"#7ca36b";ctx.fillRect(p.x,p.y,p.w,p.h);}
@@ -894,16 +992,89 @@
     drawNPCs(ctx){ctx.font="13px sans-serif";ctx.textAlign="center";for(const n of this.npcs){ctx.fillStyle="#70d7c0";ctx.fillRect(n.x,n.y,n.w,n.h);ctx.fillStyle="#fff";ctx.fillText(n.name,n.x+n.w/2,n.y-12);if(Math.abs(cx(this.player)-cx(n))<100){ctx.fillStyle="#ffe89a";ctx.fillText(`[${fmtKey(this.keys.interact)}] 互動`,n.x+n.w/2,n.y-30);}}ctx.textAlign="left";}
 
     drawPlayer(ctx,p,remote=false){
-      const cl=C.CLASSES[p.classId]||C.CLASSES.rift;ctx.save();if(p.phase>0)ctx.globalAlpha=0.55;if(p.invuln>0&&Math.floor(this.time*20)%2===0)ctx.globalAlpha*=0.45;ctx.translate(p.x+p.w/2,p.y+p.h/2);ctx.scale(p.dir||1,1);ctx.fillStyle=remote?"#75c8ff":"#f3f6ff";ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);ctx.fillStyle="#273148";ctx.fillRect(-p.w/2+8,-p.h/2+10,p.w-16,16);ctx.fillStyle="#fff";ctx.font="19px sans-serif";ctx.textAlign="center";ctx.fillText(cl.icon,0,8);ctx.fillStyle="#9fe8ff";ctx.fillRect(13,-5,remote?18:24,7);ctx.restore();
-      if(p.shield>0&&!remote){ctx.strokeStyle="rgba(120,220,255,.75)";ctx.lineWidth=4;ctx.beginPath();ctx.arc(cx(p),cy(p),48,0,Math.PI*2);ctx.stroke();}
-      if(!remote&&p.classId==="summoner"&&this.pet){ctx.fillStyle="#ffd978";ctx.beginPath();ctx.arc(this.pet.x,this.pet.y,16,0,Math.PI*2);ctx.fill();ctx.fillStyle="#fff";ctx.font="12px sans-serif";ctx.fillText("狐",this.pet.x-7,this.pet.y+4);}
+      const cl=C.CLASSES[p.classId]||C.CLASSES.rift;
+      const accent={rift:"#6ee7ff",summoner:"#ffd978",beast:"#8ff09a",artificer:"#a68cff"}[p.classId]||"#6ee7ff";
+      ctx.save();
+      // 地面光圈能快速定位玩家，即使背景很亂也不會消失。
+      ctx.globalAlpha=.35;ctx.fillStyle=accent;ctx.beginPath();ctx.ellipse(cx(p),p.y+p.h+6,45,11,0,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+      if(p.phase>0)ctx.globalAlpha=.55;if(p.invuln>0&&Math.floor(this.time*20)%2===0)ctx.globalAlpha*=.48;
+      ctx.translate(cx(p),cy(p));ctx.scale(p.dir||1,1);
+      ctx.shadowColor=accent;ctx.shadowBlur=22;ctx.strokeStyle="#07111c";ctx.lineWidth=7;ctx.fillStyle=remote?"#75c8ff":"#f7fbff";
+      // 身體輪廓
+      ctx.beginPath();ctx.roundRect(-p.w/2,-p.h/2+18,p.w,p.h-18,10);ctx.stroke();ctx.fill();
+      // 頭盔
+      ctx.fillStyle="#eaf7ff";ctx.beginPath();ctx.roundRect(-20,-p.h/2,40,30,9);ctx.fill();
+      ctx.fillStyle="#10243a";ctx.fillRect(p.dir>0?-3:-17,-p.h/2+8,20,8);
+      ctx.fillStyle=accent;ctx.fillRect(p.dir>0?10:-17,-p.h/2+9,7,6);
+      // 胸口職業核心
+      ctx.shadowBlur=14;ctx.fillStyle=accent;ctx.beginPath();ctx.arc(0,2,12,0,Math.PI*2);ctx.fill();
+      ctx.shadowBlur=0;ctx.fillStyle="#101a29";ctx.font="bold 17px sans-serif";ctx.textAlign="center";ctx.fillText(cl.icon,0,8);
+      // 面向指示器
+      ctx.fillStyle=accent;ctx.beginPath();ctx.moveTo(p.w/2+8,-3);ctx.lineTo(p.w/2+22,4);ctx.lineTo(p.w/2+8,11);ctx.fill();
+      ctx.restore();
+      if(p.shield>0&&!remote){ctx.strokeStyle="rgba(120,220,255,.85)";ctx.lineWidth=4;ctx.beginPath();ctx.arc(cx(p),cy(p),55+Math.sin(this.time*8)*3,0,Math.PI*2);ctx.stroke();}
+      if(!remote&&p.classId==="summoner"&&this.pet){ctx.fillStyle="#ffd978";ctx.shadowColor="#ffd978";ctx.shadowBlur=15;ctx.beginPath();ctx.arc(this.pet.x,this.pet.y,17,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle="#fff";ctx.font="bold 12px sans-serif";ctx.fillText("狐",this.pet.x-7,this.pet.y+4);}
     }
 
-    drawRemote(ctx){const r=this.remote;if(!r)return;this.drawPlayer(ctx,{...r,w:C.PLAYER.width,h:C.PLAYER.height,phase:0,invuln:0,shield:0},true);ctx.fillStyle="#75c8ff";ctx.font="12px sans-serif";ctx.fillText("P2",r.x,r.y-12);if(r.swapFlash>0){ctx.strokeStyle="#d075ff";ctx.beginPath();ctx.arc(r.x+23,r.y+34,50,0,Math.PI*2);ctx.stroke();}}
+    drawRemote(ctx){const r=this.remote;if(!r)return;this.drawPlayer(ctx,{...r,w:C.PLAYER.width,h:C.PLAYER.height,phase:0,invuln:0,shield:0},true);ctx.fillStyle="#75c8ff";ctx.font="bold 13px sans-serif";ctx.fillText("P2",r.x,r.y-14);if(r.swapFlash>0){ctx.strokeStyle="#d075ff";ctx.beginPath();ctx.arc(r.x+27,r.y+39,58,0,Math.PI*2);ctx.stroke();}}
 
-    drawEnemies(ctx){for(const e of this.enemies){if(e.dead)continue;const c=C.ENEMIES[e.type].color;ctx.save();ctx.fillStyle=e.hurtT>0?"#fff":c;ctx.fillRect(e.x,e.y,e.w,e.h);if(e.type==="shield"){ctx.fillStyle="#c5ced8";ctx.fillRect(e.dir<0?e.x-8:e.x+e.w-3,e.y+8,12,e.h-16);}if(e.type==="bat"){ctx.fillStyle=c;ctx.beginPath();ctx.moveTo(e.x,e.y+25);ctx.lineTo(e.x-20,e.y);ctx.lineTo(e.x+5,e.y+45);ctx.fill();ctx.beginPath();ctx.moveTo(e.x+e.w,e.y+25);ctx.lineTo(e.x+e.w+20,e.y);ctx.lineTo(e.x+e.w-5,e.y+45);ctx.fill();}ctx.fillStyle="#1b1e28";ctx.fillRect(e.x,e.y-10,e.w,6);ctx.fillStyle="#ff5e70";ctx.fillRect(e.x,e.y-10,e.w*clamp(e.hp/e.maxHp,0,1),6);if(e.marked&&e.markT>0){const el=C.ELEMENTS.find(x=>x.id===e.marked);ctx.strokeStyle=el.color;ctx.lineWidth=3;ctx.strokeRect(e.x-4,e.y-4,e.w+8,e.h+8);ctx.fillStyle=el.color;ctx.font="bold 15px sans-serif";ctx.fillText(el.glyph,e.x+e.w/2-8,e.y-18);}ctx.restore();}}
+    drawEnemies(ctx){
+      for(const e of this.enemies){if(e.dead)continue;const c=C.ENEMIES[e.type].color;ctx.save();
+        if(e.hurtT>0){ctx.shadowColor="#fff";ctx.shadowBlur=25;}else if(e.aggro){ctx.shadowColor="#ff526a";ctx.shadowBlur=12;}
+        const x=e.x,y=e.y,w=e.w,h=e.h;
+        // 每種敵人用不同剪影，先做到「不用看名字也知道不是同一隻」。
+        if(e.type==="dummy"){
+          ctx.strokeStyle="#78e4ff";ctx.lineWidth=4;ctx.strokeRect(x+5,y+5,w-10,h-10);ctx.beginPath();ctx.arc(cx(e),y+18,12,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(cx(e)-18,cy(e));ctx.lineTo(cx(e)+18,cy(e));ctx.moveTo(cx(e),cy(e)-18);ctx.lineTo(cx(e),cy(e)+18);ctx.stroke();
+        }else if(e.type==="slime"){
+          ctx.fillStyle=e.hurtT>0?"#fff":c;ctx.beginPath();ctx.ellipse(cx(e),y+h-20,w*.55,h*.42,0,Math.PI,Math.PI*2);ctx.lineTo(x+w,y+h);ctx.lineTo(x,y+h);ctx.closePath();ctx.fill();ctx.fillStyle="#14221b";ctx.fillRect(cx(e)-14,y+h-32,8,8);ctx.fillRect(cx(e)+7,y+h-32,8,8);
+        }else if(e.type==="bat"){
+          ctx.fillStyle=e.hurtT>0?"#fff":c;ctx.beginPath();ctx.moveTo(cx(e),cy(e));ctx.lineTo(x-22,y+5);ctx.lineTo(x+4,y+h-8);ctx.fill();ctx.beginPath();ctx.moveTo(cx(e),cy(e));ctx.lineTo(x+w+22,y+5);ctx.lineTo(x+w-4,y+h-8);ctx.fill();ctx.beginPath();ctx.arc(cx(e),cy(e),15,0,Math.PI*2);ctx.fill();
+        }else if(e.type==="turret"){
+          ctx.fillStyle=e.hurtT>0?"#fff":c;ctx.fillRect(x,y+18,w,h-18);ctx.fillStyle="#d9eef5";ctx.fillRect(e.dir>0?cx(e):x-26,y+22,32,10);ctx.fillStyle="#2b3944";ctx.fillRect(x-5,y+h-10,w+10,12);
+        }else if(e.type==="mage"){
+          ctx.fillStyle=e.hurtT>0?"#fff":c;ctx.beginPath();ctx.moveTo(cx(e),y);ctx.lineTo(x+w,y+h);ctx.lineTo(x,y+h);ctx.closePath();ctx.fill();ctx.fillStyle="#e7dcff";ctx.beginPath();ctx.arc(cx(e),y+16,9,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#d5b8ff";ctx.beginPath();ctx.arc(cx(e)+e.dir*28,y+25,11+Math.sin(this.time*5)*3,0,Math.PI*2);ctx.stroke();
+        }else if(e.type==="golem"){
+          ctx.fillStyle=e.hurtT>0?"#fff":c;ctx.fillRect(x+8,y+16,w-16,h-16);ctx.fillRect(x-8,y+34,18,35);ctx.fillRect(x+w-10,y+34,18,35);ctx.fillStyle="#ffca66";ctx.fillRect(cx(e)-9,y+35,18,15);
+        }else if(e.type==="boss"){
+          ctx.fillStyle=e.hurtT>0?"#fff":c;ctx.beginPath();ctx.moveTo(x,y+25);ctx.lineTo(x+18,y);ctx.lineTo(cx(e),y+18);ctx.lineTo(x+w-18,y);ctx.lineTo(x+w,y+25);ctx.lineTo(x+w,y+h);ctx.lineTo(x,y+h);ctx.closePath();ctx.fill();ctx.fillStyle="#ffe3e8";ctx.fillRect(cx(e)-18,y+36,36,12);
+        }else{
+          ctx.fillStyle=e.hurtT>0?"#fff":c;ctx.beginPath();ctx.roundRect(x,y,w,h,10);ctx.fill();
+          if(e.type==="shield"){ctx.fillStyle="#d4dde8";ctx.beginPath();const sx=e.dir<0?x-12:x+w-4;ctx.roundRect(sx,y+5,17,h-10,6);ctx.fill();}
+          if(e.type==="archer"){ctx.strokeStyle="#ffe2a6";ctx.lineWidth=3;ctx.beginPath();ctx.arc(cx(e)+e.dir*16,cy(e),18,-1.2,1.2);ctx.stroke();}
+        }
+        ctx.shadowBlur=0;
+        // 名稱、血條、警戒符號
+        const near=Math.abs(cx(this.player)-cx(e))<900||e.aggro||e.type==="dummy";
+        if(near){ctx.fillStyle="rgba(5,8,13,.88)";ctx.fillRect(x-5,y-31,w+10,20);ctx.fillStyle=e.type==="dummy"?"#9ff0ff":"#fff";ctx.font="bold 11px sans-serif";ctx.textAlign="center";ctx.fillText(e.type==="dummy"?"訓練傀儡｜不會攻擊":e.name,cx(e),y-17);ctx.fillStyle="#23131a";ctx.fillRect(x,y-9,w,6);ctx.fillStyle=e.type==="dummy"?"#6de7ff":"#ff5e70";ctx.fillRect(x,y-9,w*clamp(e.hp/e.maxHp,0,1),6);}
+        if(e.aggro){ctx.fillStyle="#ff526a";ctx.beginPath();ctx.arc(cx(e),y-48,15,0,Math.PI*2);ctx.fill();ctx.fillStyle="#fff";ctx.font="900 19px sans-serif";ctx.fillText("!",cx(e),y-41);}
+        if(e.marked&&e.markT>0){const el=C.ELEMENTS.find(x=>x.id===e.marked);ctx.strokeStyle=el.color;ctx.shadowColor=el.color;ctx.shadowBlur=12;ctx.lineWidth=4;ctx.setLineDash([8,5]);ctx.strokeRect(x-7,y-7,w+14,h+14);ctx.setLineDash([]);ctx.shadowBlur=0;ctx.fillStyle=el.color;ctx.font="bold 14px sans-serif";ctx.fillText(`${el.glyph}｜再按 ${C.ELEMENTS.indexOf(el)===9?0:C.ELEMENTS.indexOf(el)+1} 換位`,cx(e),y-67);}
+        ctx.restore();
+      }
+      ctx.textAlign="left";
+    }
 
-    drawProjectiles(ctx){for(const s of this.projectiles){const el=C.ELEMENTS.find(e=>e.id===s.element);ctx.fillStyle=el.color;ctx.shadowColor=el.color;ctx.shadowBlur=14;ctx.beginPath();ctx.arc(cx(s),cy(s),s.w/2,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle="#172030";ctx.font="bold 11px sans-serif";ctx.textAlign="center";ctx.fillText(el.glyph,cx(s),cy(s)+4);ctx.textAlign="left";}for(const s of this.enemyShots){ctx.fillStyle="#ff6780";ctx.beginPath();ctx.arc(cx(s),cy(s),7,0,Math.PI*2);ctx.fill();}}
+    drawProjectiles(ctx){
+      for(const s of this.projectiles){const el=C.ELEMENTS.find(e=>e.id===s.element);if(!el)continue;const x=cx(s),y=cy(s),r=s.w/2;
+        ctx.save();
+        // 長軌跡：讓玩家一眼看出彈道與移動方向。
+        const tr=s.trail||[];for(let i=tr.length-1;i>=0;i--){const a=(tr.length-i)/tr.length*.32;ctx.fillStyle=colorAlpha(el.color,a);ctx.beginPath();ctx.arc(tr[i].x,tr[i].y,Math.max(2,r*(i+1)/tr.length*.45),0,Math.PI*2);ctx.fill();}
+        ctx.shadowColor=el.color;ctx.shadowBlur=24;ctx.strokeStyle=el.color;ctx.fillStyle=el.color;ctx.lineWidth=4;
+        if(el.id==="fire"){ctx.beginPath();ctx.arc(x,y,r*.72,0,Math.PI*2);ctx.fill();ctx.fillStyle="#ffe59a";ctx.beginPath();ctx.arc(x+r*.18,y-r*.12,r*.32,0,Math.PI*2);ctx.fill();}
+        else if(el.id==="ice"){ctx.translate(x,y);ctx.rotate(Math.PI/4);ctx.fillRect(-r*.55,-r*.55,r*1.1,r*1.1);ctx.strokeStyle="#e7fbff";ctx.strokeRect(-r*.32,-r*.32,r*.64,r*.64);ctx.translate(-x,-y);}
+        else if(el.id==="lightning"){ctx.beginPath();ctx.moveTo(x-r,y-r*.5);ctx.lineTo(x-r*.15,y-r*.05);ctx.lineTo(x-r*.5,y+r*.15);ctx.lineTo(x+r,y+r*.55);ctx.stroke();ctx.fillStyle="#fff9bd";ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);ctx.fill();}
+        else if(el.id==="wind"){for(let q=0;q<3;q++){ctx.beginPath();ctx.arc(x,y,r*(.45+q*.24),-.9,1.7);ctx.stroke();}}
+        else if(el.id==="earth"){ctx.beginPath();for(let q=0;q<7;q++){const a=q/7*Math.PI*2,rr=r*(q%2?.72:1);const px=x+Math.cos(a)*rr,py=y+Math.sin(a)*rr;q?ctx.lineTo(px,py):ctx.moveTo(px,py);}ctx.closePath();ctx.fill();ctx.strokeStyle="#e5c090";ctx.stroke();}
+        else if(el.id==="water"){ctx.beginPath();ctx.arc(x,y,r*.78,0,Math.PI*2);ctx.fill();ctx.fillStyle="#c8f2ff";ctx.beginPath();ctx.arc(x-r*.2,y-r*.23,r*.22,0,Math.PI*2);ctx.fill();}
+        else if(el.id==="light"){ctx.translate(x,y);for(let q=0;q<8;q++){ctx.rotate(Math.PI/4);ctx.beginPath();ctx.moveTo(0,-r);ctx.lineTo(r*.22,-r*.26);ctx.lineTo(0,-r*.42);ctx.closePath();ctx.fill();}ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(0,0,r*.35,0,Math.PI*2);ctx.fill();ctx.translate(-x,-y);}
+        else if(el.id==="shadow"){ctx.fillStyle="#170b31";ctx.beginPath();ctx.arc(x,y,r*.78,0,Math.PI*2);ctx.fill();ctx.strokeStyle=el.color;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(x,y,r*.52,0,Math.PI*2);ctx.stroke();}
+        else if(el.id==="nature"){ctx.beginPath();ctx.ellipse(x,y,r,r*.55,-.55,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#d4ffd7";ctx.beginPath();ctx.moveTo(x-r*.7,y+r*.38);ctx.lineTo(x+r*.65,y-r*.32);ctx.stroke();}
+        else if(el.id==="gravity"){ctx.fillStyle="#160820";ctx.beginPath();ctx.arc(x,y,r*.5,0,Math.PI*2);ctx.fill();for(let q=1;q<=3;q++){ctx.strokeStyle=colorAlpha(el.color,1-q*.18);ctx.beginPath();ctx.arc(x,y,r*(.45+q*.24)+Math.sin(this.time*5+q)*4,0,Math.PI*2);ctx.stroke();}}
+        ctx.shadowBlur=0;
+        if(s.anchor){const i=C.ELEMENTS.indexOf(el),key=i===9?0:i+1;ctx.strokeStyle=colorAlpha(el.color,.9);ctx.lineWidth=2;ctx.setLineDash([5,4]);ctx.beginPath();ctx.arc(x,y,r+10+Math.sin(this.time*7)*3,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle="rgba(4,8,14,.88)";ctx.fillRect(x-34,y-r-31,68,20);ctx.fillStyle=el.color;ctx.font="900 11px sans-serif";ctx.textAlign="center";ctx.fillText(`${key} 再按 ↔`,x,y-r-17);}
+        ctx.restore();
+      }
+      for(const s of this.enemyShots){ctx.save();const x=cx(s),y=cy(s);if(s.warmup>0){const pulse=1-s.warmup/.42;ctx.strokeStyle="#ff6278";ctx.lineWidth=3;ctx.beginPath();ctx.arc(x,y,12+pulse*25,0,Math.PI*2);ctx.stroke();ctx.fillStyle="#fff";ctx.font="900 10px sans-serif";ctx.textAlign="center";ctx.fillText("!",x,y+3);}else{ctx.strokeStyle="rgba(255,88,112,.5)";ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(x-s.vx*.09,y-s.vy*.09);ctx.lineTo(x,y);ctx.stroke();ctx.fillStyle="#fff";ctx.shadowColor="#ff4664";ctx.shadowBlur=18;ctx.beginPath();ctx.arc(x,y,8,0,Math.PI*2);ctx.fill();}ctx.restore();}
+    }
     drawTurrets(ctx){for(const t of this.turrets){ctx.fillStyle=t.overload>0?"#ffe45c":"#66e6ff";ctx.fillRect(t.x,t.y,t.w,t.h);ctx.fillRect(t.x+10,t.y-8,30,8);}}
 
     drawEffectsBehind(ctx){for(const e of this.effects){if(e.type==="gravityWell"){ctx.strokeStyle=colorAlpha(e.color,0.6);for(let i=0;i<4;i++){ctx.beginPath();ctx.arc(e.x,e.y,(e.r*(i+1)/4)*(0.8+0.2*Math.sin(this.time*3+i)),0,Math.PI*2);ctx.stroke();}}if(e.type==="fountain"){ctx.fillStyle=colorAlpha(e.color,0.35);ctx.fillRect(e.x-20,e.y-180,40,180);}if(e.type==="danger"){ctx.fillStyle=colorAlpha(e.color,0.22);ctx.fillRect(e.x,e.y,e.w,e.h);}}}

@@ -968,3 +968,115 @@ map: expand beast forest
 ```
 
 這樣某次改壞時，你可以回到上一個可玩的版本，而不是整份程式一起報廢。
+
+---
+
+# V2.2：如果你要改「看不看得清楚」
+
+## 主角大小
+
+`js/config.js`：
+
+```js
+PLAYER: {
+  width: 54,
+  height: 78,
+}
+```
+
+先改這裡，再看 hitbox 是否需要一起重新平衡。
+
+## 世界畫面上下位置
+
+`js/game.js` 建構子：
+
+```js
+this.camera = { x: 0, y: 110 };
+```
+
+`y` 越大，整個世界會在螢幕上看起來越往上移。
+
+原因是 V2.2 底部有技能與元素 HUD，所以保留約 110px 給 UI。
+
+## 新手安全區多長
+
+`js/game.js`：
+
+```js
+this.safeZoneEnd = 1180;
+```
+
+想讓玩家更晚被敵人攻擊，可以改大，例如：
+
+```js
+this.safeZoneEnd = 1800;
+```
+
+## 敵人何時會注意玩家
+
+搜尋：
+
+```js
+const range=e.type==="boss"?1450:850;
+```
+
+一般敵人目前約 850px 內才進入 awareness。
+
+## 敵方遠距攻擊預警
+
+搜尋 `enemyShoot()`：
+
+```js
+warmup: 0.42
+```
+
+數字越大，玩家越有時間看到預警。
+
+## 元素彈體大小
+
+`config.js` 每種元素都有：
+
+```js
+size: 18
+```
+
+而 `fireElement()` 還會乘：
+
+```js
+const visualSize = el.size * 2.35;
+```
+
+所以你可以只改資料表，也可以整體改 2.35 這個倍率。
+
+## 元素彈速
+
+仍然直接在 `config.js`：
+
+```js
+speed: 300
+```
+
+V2.2 已刻意比上一版慢，因為「看得到子彈」比物理上很快更重要。
+
+## 修改 HUD
+
+所有 HUD 排版都集中在：
+
+```text
+styles.css
+```
+
+重要 class：
+
+```text
+.hud-left
+.hud-center
+.hud-right
+.combat-dock
+.skills
+.element-chip
+.current-element
+.threat-panel
+```
+
+如果 UI 位置怪，先改 CSS，不要先碰遊戲物理。

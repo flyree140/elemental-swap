@@ -13,14 +13,14 @@
  */
 
 window.ES_CONFIG = {
-  VERSION: "2.1.0-regenerated",
+  VERSION: "2.2.0-visibility-combat-feedback",
   WORLD_WIDTH: 18000,
   WORLD_HEIGHT: 900,
   GROUND_Y: 710,
   GRAVITY: 1800,
   PLAYER: {
-    width: 46,
-    height: 68,
+    width: 54,
+    height: 78,
     moveSpeed: 360,
     jumpPower: 700,
     maxFallSpeed: 1100,
@@ -33,52 +33,52 @@ window.ES_CONFIG = {
   ELEMENTS: [
     {
       id: "fire", name: "火焰", glyph: "火", color: "#ff5a36",
-      speed: 410, gravity: 0, damage: 18, size: 13, markDuration: 7,
+      speed: 300, gravity: 0, damage: 18, size: 18, markDuration: 7,
       description: "燃燒持續傷害；換位時在新舊位置各引爆一次。"
     },
     {
       id: "ice", name: "冰霜", glyph: "冰", color: "#7ddcff",
-      speed: 300, gravity: 260, damage: 11, size: 15, markDuration: 8,
+      speed: 235, gravity: 245, damage: 11, size: 22, markDuration: 8,
       description: "大幅緩速並可凍結水面；換位後原地生成暫時冰平台。"
     },
     {
       id: "lightning", name: "雷電", glyph: "雷", color: "#ffe45c",
-      speed: 680, gravity: 0, damage: 13, size: 10, markDuration: 5,
+      speed: 520, gravity: 0, damage: 13, size: 13, markDuration: 5,
       description: "短暫暈眩；對濕潤目標增傷並連鎖附近敵人。"
     },
     {
       id: "wind", name: "疾風", glyph: "風", color: "#8fffc4",
-      speed: 470, gravity: -60, damage: 7, size: 17, markDuration: 5,
+      speed: 330, gravity: -50, damage: 7, size: 25, markDuration: 5,
       description: "超高擊退；換位後獲得高速風衝與空中滯留。"
     },
     {
       id: "earth", name: "岩土", glyph: "岩", color: "#b98a5a",
-      speed: 250, gravity: 620, damage: 24, size: 20, markDuration: 9,
+      speed: 190, gravity: 560, damage: 24, size: 28, markDuration: 9,
       description: "重擊與破甲；換位後原地留下可站立石柱並短暫霸體。"
     },
     {
       id: "water", name: "流水", glyph: "水", color: "#4f8fff",
-      speed: 340, gravity: 90, damage: 8, size: 14, markDuration: 9,
+      speed: 250, gravity: 80, damage: 8, size: 22, markDuration: 9,
       description: "附加濕潤並熄滅火；換位後噴泉將玩家彈起並回復生命。"
     },
     {
       id: "light", name: "聖光", glyph: "光", color: "#fff8b3",
-      speed: 430, gravity: 0, damage: 10, size: 12, markDuration: 8,
+      speed: 360, gravity: 0, damage: 10, size: 18, markDuration: 8,
       description: "照出隱形物；換位時治療並獲得護盾。"
     },
     {
       id: "shadow", name: "暗影", glyph: "影", color: "#9d75ff",
-      speed: 370, gravity: 0, damage: 14, size: 14, markDuration: 8,
+      speed: 285, gravity: 0, damage: 14, size: 21, markDuration: 8,
       description: "能穿越影牆；換位後短暫相位無敵並留下影分身。"
     },
     {
       id: "nature", name: "自然", glyph: "藤", color: "#69d66f",
-      speed: 280, gravity: 330, damage: 9, size: 14, markDuration: 10,
+      speed: 215, gravity: 300, damage: 9, size: 20, markDuration: 10,
       description: "纏根敵人與喚醒種子；換位後生成可攀爬藤蔓。"
     },
     {
       id: "gravity", name: "引力", glyph: "引", color: "#ec77ff",
-      speed: 185, gravity: -25, damage: 6, size: 22, markDuration: 11,
+      speed: 145, gravity: -18, damage: 6, size: 32, markDuration: 11,
       description: "吸引周圍物件；換位後留下引力井並短暫低重力。"
     }
   ],
@@ -112,6 +112,7 @@ window.ES_CONFIG = {
   },
 
   ENEMIES: {
+    dummy: {name: "訓練傀儡", hp: 999, speed: 0, damage: 0, type: "passive", color: "#78e4ff"},
     slime: {name: "裂膠史萊姆", hp: 55, speed: 90, damage: 10, type: "melee", color: "#66d978"},
     archer: {name: "回路弓手", hp: 72, speed: 70, damage: 12, type: "ranged", color: "#e0aa55"},
     shield: {name: "盾式守衛", hp: 125, speed: 55, damage: 16, type: "shield", color: "#7e93a8"},
