@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#74cbe0">
+  <title>Elemental Swap V5｜植生舊都・解謎擴充</title>
+  <meta name="description" content="光影像素風 2D 橫向卷軸：X/Y 多分支連段、十元素真實能力、標記換位與三階段 Boss。">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><strong>ELEMENTAL SWAP</strong><span>V5 · LIVING RUINS</span></div>
+    <div class="top-actions">
+      <label>職業 <select id="classSelect"></select></label>
+      <button type="button" onclick="document.getElementById('helpPanel').hidden=false;window.ElementalSwap&&(ElementalSwap.game.modal=true)">完整說明 H</button>
+      <button type="button" onclick="window.ElementalSwap?.game?.openSettings()">自訂按鍵 K</button>
+    </div>
+  </header>
+
+  <main class="game-frame">
+    <canvas id="game" width="1600" height="900" tabindex="0" aria-label="Elemental Swap V4 遊戲畫面"></canvas>
+
+    <section class="hud player-hud">
+      <div class="portrait">ES</div>
+      <div class="player-data">
+        <div class="class-line"><strong id="className">裂隙劍士</strong><span id="classResource">裂隙 0/100</span></div>
+        <div class="bar hp"><i id="hpFill"></i><span id="hpText">HP</span></div>
+        <div class="bar mp"><i id="mpFill"></i><span id="mpText">MP</span></div>
+      </div>
+    </section>
+
+    <section class="hud center-hud">
+      <strong id="zoneName">01 綠蔭舊街</strong>
+      <div id="commandName" class="command-name">X / Y COMMAND</div>
+      <div id="combo" class="combo"></div>
+    </section>
+
+    <section id="bossHUD" class="boss-hud">
+      <div class="boss-title"><span>十相哨兵・赫利俄斯</span><b id="bossPhase">PHASE 1</b></div>
+      <div class="boss-hp"><i id="bossHpFill"></i></div>
+      <div class="boss-break"><span>BREAK</span><i id="bossBreakFill"></i></div>
+    </section>
+
+    <section class="hud objective-hud">
+      <small>CURRENT OBJECTIVE</small>
+      <strong id="objectiveTitle">STEP 1｜方向鍵移動</strong>
+      <span id="objectiveText">方向鍵預設在數字鍵盤旁；A/D 仍是副鍵。</span>
+      <div id="threatPanel" class="threat-panel safe">SAFE｜安全訓練區</div>
+      <div id="puzzleTracker" class="puzzle-tracker"></div>
+    </section>
+
+    <div id="startCoach" class="start-coach"><strong>▼ YOU / 玩家</strong><span>發光角色就是你</span></div>
+    <div id="damageVignette" class="damage-vignette"></div>
+    <div id="toast" class="toast"></div>
+
+    <section class="combat-dock">
+      <div class="combo-cheatsheet">
+        <b>X / Y COMMAND</b>
+        <span><kbd>X</kbd><kbd>X</kbd><kbd>X</kbd><kbd>X</kbd> 四段快攻</span>
+        <span><kbd>X</kbd><kbd>X</kbd><kbd>Y</kbd> 挑空</span>
+        <span><kbd>↑</kbd>／<kbd>↓</kbd>＋X/Y 上下段</span>
+        <span>Dash＋X/Y · Air X/Y</span>
+      </div>
+      <div id="elementInfo" class="element-info"><strong>十元素</strong><span>1–0 發射；同元素再按一次＝與彈丸／標記敵人換位。</span></div>
+      <div id="skills" class="skills"></div>
+      <div id="elements" class="elements"></div>
+    </section>
+
+    <div id="pauseOverlay" class="overlay" hidden><div><h2>PAUSED</h2><p>按 P 繼續</p></div></div>
+    <div id="completeOverlay" class="overlay" hidden><div><h2>回路復原</h2><p>你完成了 V4 展示關。</p><button onclick="location.reload()">重新開始</button></div></div>
+  </main>
+
+  <section class="network-strip">
+    <div><strong>2P WebRTC</strong><span id="netStatus">單人模式</span></div>
+    <input id="roomCode" placeholder="房間代碼" autocomplete="off" spellcheck="false">
+    <button id="hostBtn">建立房間</button><button id="joinBtn">加入房間</button><button id="disconnectBtn" class="ghost">斷線</button>
+  </section>
+
+  <section class="key-strip" aria-label="預設操作">
+    <span><b>← →</b> 移動</span><span><b>↑ ↓</b> 方向指令／瞄準</span><span><b>SPACE ×2</b> 跳躍</span><span><b>SHIFT</b> Dash</span><span><b>X / Y</b> Command</span><span><b>C V B</b> 技能</span><span><b>Q</b> 職業能力</span><span><b>1–0</b> 元素換位</span>
+  </section>
+</div>
+
+<div id="helpPanel" class="modal" hidden>
+  <div class="panel wide">
+    <button id="closeHelp" class="close">×</button>
+    <h2>V5 完整操作與系統</h2>
+    <div class="help-grid">
+      <article><h3>方向鍵＋X/Y</h3><p>預設使用數字鍵盤旁的方向鍵。放開方向輸入 X/Y 連段；按住 ↑、↓、前、後再按 X/Y，會變成完全不同招式。</p><p>範例：XXXX、XXY 挑空、XYX 三連、YXX 掃倒、↑Y 天穹破、↓Y 地脈崩擊、Dash Y 破陣衝鋒。</p></article>
+      <article><h3>浮空、倒地、受身</h3><p>XXY 或 ↑X／↑Y 可挑空；空中 X 追擊，空中 ↓Y 墜星。敵人累積 KD 後會倒地，避免無限連；Air Y 可對一次倒地做 Ground Bounce。</p><p>玩家被重擊倒地後，約 0.28–0.84 秒內按 SPACE 可受身。</p></article>
+      <article><h3>元素不是換位子彈</h3><p>火會燃燒並留下火區；冰會凍結與造平台；引力彈飛行與引力井都會真的吸怪、箱子與核心球；水會濕潤與造噴泉；光會顯示光橋；影會相位穿牆；自然會生藤。</p></article>
+      <article><h3>Boss</h3><p>Boss 有三階段與 BREAK 條。紅色長條、十字線與地面區域會先預警，再產生傷害。BREAK 歸零後 Boss 失衡 2.6 秒，傷害 ×1.5。</p></article>
+      <article><h3>元素連鎖</h3><ul><li>冰→火：熱震破牆</li><li>水→雷：導電暴潮</li><li>火→風：烈風火環</li><li>岩→藤：岩根隆起</li><li>光↔影：明暗蝕相</li><li>引→風：引力彈弓</li></ul></article>
+      <article><h3>開發測試</h3><p>F12 Console：<code>ElementalSwap.debug.boss()</code> 去 Boss；<code>ElementalSwap.debug.heal()</code> 補滿；<code>ElementalSwap.debug.class('summoner')</code> 切職業。</p></article>
+    </div>
+  </div>
+</div>
+
+<div id="settingsPanel" class="modal" hidden>
+  <div class="panel">
+    <button id="closeSettings" class="close">×</button>
+    <h2>自訂按鍵</h2><p>點選一列後按新鍵。撞鍵時兩個動作自動交換。設定會儲存在瀏覽器。</p>
+    <div id="keyList" class="key-list"></div><button id="resetKeys">還原方向鍵＋X/Y 預設</button>
+  </div>
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/network.js"></script>
+<script src="js/game.js"></script>
+<script src="js/v5_enhancements.js"></script>
+</body>
+</html>

@@ -1,0 +1,148 @@
+{
+  "ok": true,
+  "version": "5.0.0-living-ruins-puzzle-expansion",
+  "enemies": 27,
+  "zones": 8,
+  "elements": 10,
+  "puzzles": 40,
+  "npcs": 10,
+  "summons": 10,
+  "beastForm": "eagle",
+  "skillResults": {
+    "rift": [
+      {
+        "fx": 3,
+        "attacks": 3,
+        "fields": 0,
+        "shots": 0
+      },
+      {
+        "fx": 1,
+        "attacks": 1,
+        "fields": 0,
+        "shots": 0
+      },
+      {
+        "fx": 8,
+        "attacks": 7,
+        "fields": 0,
+        "shots": 0
+      }
+    ],
+    "summoner": [
+      {
+        "fx": 1,
+        "attacks": 0,
+        "fields": 0,
+        "shots": 0
+      },
+      {
+        "fx": 1,
+        "attacks": 0,
+        "fields": 0,
+        "shots": 0
+      },
+      {
+        "fx": 1,
+        "attacks": 0,
+        "fields": 0,
+        "shots": 0
+      }
+    ],
+    "beast": [
+      {
+        "fx": 0,
+        "attacks": 4,
+        "fields": 0,
+        "shots": 0
+      },
+      {
+        "fx": 0,
+        "attacks": 0,
+        "fields": 1,
+        "shots": 0
+      },
+      {
+        "fx": 1,
+        "attacks": 0,
+        "fields": 0,
+        "shots": 0
+      }
+    ],
+    "artificer": [
+      {
+        "fx": 3,
+        "attacks": 0,
+        "fields": 0,
+        "shots": 0
+      },
+      {
+        "fx": 1,
+        "attacks": 0,
+        "fields": 0,
+        "shots": 0
+      },
+      {
+        "fx": 1,
+        "attacks": 0,
+        "fields": 0,
+        "shots": 0
+      }
+    ]
+  },
+  "elementResults": {
+    "fire": {
+      "fields": 2,
+      "temp": 0,
+      "hpDelta": 0
+    },
+    "ice": {
+      "fields": 0,
+      "temp": 1,
+      "hpDelta": 0
+    },
+    "lightning": {
+      "fields": 0,
+      "temp": 0,
+      "hpDelta": 0
+    },
+    "wind": {
+      "fields": 0,
+      "temp": 0,
+      "hpDelta": 0
+    },
+    "earth": {
+      "fields": 0,
+      "temp": 1,
+      "hpDelta": 0
+    },
+    "water": {
+      "fields": 1,
+      "temp": 0,
+      "hpDelta": 20
+    },
+    "light": {
+      "fields": 0,
+      "temp": 0,
+      "hpDelta": 16
+    },
+    "shadow": {
+      "fields": 1,
+      "temp": 0,
+      "hpDelta": 9
+    },
+    "nature": {
+      "fields": 0,
+      "temp": 1,
+      "hpDelta": 0
+    },
+    "gravity": {
+      "fields": 1,
+      "temp": 0,
+      "hpDelta": 0
+    }
+  },
+  "bossPhase": 3,
+  "bossBreakStun": 2.6,
+  "safeHp": 145
+}

@@ -1,0 +1,12 @@
+Elemental Swap V5
+=================
+
+本機最快測試：開啟 Elemental_Swap_V5_Standalone.html
+GitHub Pages：上傳 index.html、styles.css、js/、assets/ 與其他同層檔案。
+不要單獨預覽 index.html，因為它是多檔入口。
+
+主要更新：
+- 安全換位，不再落入平台。
+- 召喚師有實體召喚物。
+- 百獸使有狼／鷹／熊／百獸王外觀。
+- 40 個解謎物件、10 名 NPC 與引導清單。

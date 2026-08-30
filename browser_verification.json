@@ -1,0 +1,77 @@
+{
+  "initial": {
+    "v5": true,
+    "version": "5.0.0-living-ruins-puzzle-expansion",
+    "hp": 190,
+    "maxHp": 190,
+    "x": 180,
+    "y": 642,
+    "enemies": 27,
+    "zones": 8,
+    "elements": 10,
+    "puzzles": 40,
+    "npcs": 10,
+    "assets": 61,
+    "embedded": 73,
+    "elementChips": 10,
+    "skillChips": 6,
+    "puzzleTasks": 3,
+    "canvas": {
+      "w": 1576,
+      "h": 884,
+      "cssW": 1576,
+      "cssH": 884.75
+    }
+  },
+  "safeStartHp": [
+    190,
+    190
+  ],
+  "moved": {
+    "x": 311.7256632685906,
+    "y": 642
+  },
+  "shot": {
+    "before": 0,
+    "after": 1,
+    "fire": 1,
+    "last": "fire"
+  },
+  "swap": {
+    "swaps": 1,
+    "x": 441.53774029800365,
+    "y": 642,
+    "bottom": 720,
+    "fields": [
+      "flame",
+      "flame"
+    ]
+  },
+  "safeSwap": {
+    "x": 543,
+    "y": 505,
+    "bottom": 583,
+    "platformTop": 585,
+    "alive": true,
+    "under": false
+  },
+  "summons": {
+    "class": "summoner",
+    "kinds": [
+      "fox",
+      "fox",
+      "fox",
+      "guardian",
+      "starbeast"
+    ],
+    "count": 5
+  },
+  "beast": {
+    "before": "wolf",
+    "after": "eagle",
+    "asset": "player_beast_eagle",
+    "hasAsset": true
+  },
+  "errors": [],
+  "logsTail": []
+}
